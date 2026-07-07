@@ -43,6 +43,7 @@ public class GuardianHealGoal extends Goal {
 
     @Override
     public void start() {
+        guardian.setSuppressMainHandSync(true);
         beginEating();
     }
 
@@ -84,6 +85,7 @@ public class GuardianHealGoal extends Goal {
 
     @Override
     public void stop() {
+        guardian.setSuppressMainHandSync(false);
         // Restaurar ítem de mano principal
         ItemStack mainhand = guardian.getGuardianContainer()
                 .getItem(GuardianContainer.SLOT_MAINHAND);

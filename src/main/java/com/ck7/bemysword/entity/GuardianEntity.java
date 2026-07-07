@@ -71,6 +71,14 @@ public class GuardianEntity extends net.minecraft.world.entity.TamableAnimal imp
     // para que no se mueva justo cuando está en el aire y termine esquivándola sin querer)
     private int holdStillTicks = 0;
 
+    // Mientras es true, la sincronización periódica de equipamiento no toca la mano
+    // principal (usado por GuardianHealGoal/GuardianPotionGoal mientras sostienen
+    // comida o una poción, para que se vea en mano durante toda la animación).
+    private boolean suppressMainHandSync = false;
+    public void setSuppressMainHandSync(boolean value) {
+        this.suppressMainHandSync = value;
+    }
+
     // Cuántas razones distintas quieren que el guardián no se mueva ahora mismo (GUI de
     // inventario abierta, esperando una poción arrojadiza, etc.). Contador en vez de un
     // simple booleano porque pueden pedirlo varias cosas a la vez y no queremos que una
@@ -773,8 +781,14 @@ public class GuardianEntity extends net.minecraft.world.entity.TamableAnimal imp
                         guardianContainer.getItem(GuardianContainer.SLOT_LEGGINGS));
                 setItemSlot(net.minecraft.world.entity.EquipmentSlot.FEET,
                         guardianContainer.getItem(GuardianContainer.SLOT_BOOTS));
-                setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND,
-                        guardianContainer.getItem(GuardianContainer.SLOT_MAINHAND));
+                // Mientras esté comiendo/bebiendo algo (mano ocupada temporalmente con
+                // comida o una poción), no pisar eso con el arma real del container -
+                // si no, esta sincronización cada 10 ticks lo devuelve al arma a los
+                // pocos ticks y la comida/poción solo se ve en mano un instante.
+                if (!suppressMainHandSync) {
+                    setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND,
+                            guardianContainer.getItem(GuardianContainer.SLOT_MAINHAND));
+                }
                 setItemSlot(net.minecraft.world.entity.EquipmentSlot.OFFHAND,
                         guardianContainer.getItem(GuardianContainer.SLOT_OFFHAND));
             }

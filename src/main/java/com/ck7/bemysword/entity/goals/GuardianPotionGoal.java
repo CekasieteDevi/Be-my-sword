@@ -47,6 +47,7 @@ public class GuardianPotionGoal extends Goal {
 
     @Override
     public void start() {
+        guardian.setSuppressMainHandSync(true);
         drinkTimer = DRINK_DURATION;
         slotBeingDrunk = findCombatPotionSlot();
         if (slotBeingDrunk >= 0) {
@@ -75,6 +76,7 @@ public class GuardianPotionGoal extends Goal {
 
     @Override
     public void stop() {
+        guardian.setSuppressMainHandSync(false);
         ItemStack mainhand = guardian.getGuardianContainer().getItem(GuardianContainer.SLOT_MAINHAND);
         guardian.setItemInHand(InteractionHand.MAIN_HAND, mainhand);
         drinkTimer = 0;
