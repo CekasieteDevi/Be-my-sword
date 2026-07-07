@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(.\\gradlew.bat runClient *)",
+      "PowerShell(Get-ChildItem *)",
+      "PowerShell(.\\gradlew.bat compileJava *)",
+      "PowerShell(Get-CimInstance *)",
+      "PowerShell(Get-Process *)",
+      "PowerShell(Get-Content *)",
+      "PowerShell(Get-WinEvent *)"
+    ]
+  }
+}

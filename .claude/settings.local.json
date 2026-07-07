@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-ChildItem *)",
+      "PowerShell(.\\\\gradlew.bat compileJava --console=plain 2>&1 | Select-Object -Last 80)",
+      "PowerShell(.\\\\gradlew.bat runClient --console=plain)",
+      "PowerShell(Get-CimInstance *)",
+      "PowerShell(.\\\\gradlew.bat compileJava --console=plain 2>&1 | Select-Object -Last 30)",
+      "PowerShell(.\\\\gradlew.bat compileJava --console=plain 2>&1 | Select-Object -Last 60)",
+      "PowerShell(New-Item *)",
+      "PowerShell(.\\\\gradlew.bat build -x test --console=plain 2>&1 | Select-Object -Last 60)",
+      "PowerShell(.\\\\gradlew.bat compileJava --console=plain 2>&1 | Select-Object -Last 40)",
+      "Skill(fewer-permission-prompts)",
+      "PowerShell(& \"C:\\\\Users\\\\Administrator\\\\.gradle\\\\jdks\\\\eclipse_adoptium-17-amd64-windows\\\\jdk-17.0.18+8\\\\bin\\\\javap.exe\" -classpath $jar -p net.minecraft.world.DifficultyInstance 2>&1)",
+      "PowerShell($jar = \"C:\\\\Users\\\\Administrator\\\\.gradle\\\\caches\\\\forge_gradle\\\\minecraft_user_repo\\\\net\\\\minecraftforge\\\\forge\\\\1.20.1-47.2.0_mapped_official_1.20.1\\\\forge-1.20.1-47.2.0_mapped_official_1.20.1.jar\")",
+      "PowerShell(Stop-Process *)",
+      "PowerShell(.\\\\gradlew.bat processResources --console=plain 2>&1)",
+      "PowerShell(gh auth *)",
+      "PowerShell(winget install *)",
+      "PowerShell(git *)"
+    ]
+  }
+}
