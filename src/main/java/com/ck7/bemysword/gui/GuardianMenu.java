@@ -99,6 +99,12 @@ public class GuardianMenu extends AbstractContainerMenu {
     }
 
     @Override
+    public void removed(Player player) {
+        super.removed(player);
+        guardian.onInventoryClosed();
+    }
+
+    @Override
     public ItemStack quickMoveStack(Player player, int index) {
         ItemStack returnStack = ItemStack.EMPTY;
         Slot slot = this.slots.get(index);

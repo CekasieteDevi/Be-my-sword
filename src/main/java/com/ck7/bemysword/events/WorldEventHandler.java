@@ -43,6 +43,7 @@ public class WorldEventHandler {
         // Buscar al guardián que hizo el kill o asistió
         if (event.getSource().getEntity() instanceof GuardianEntity guardian) {
             guardian.addExperience(expReward);
+            guardian.pauseAfterKill();
             notifyLevelUp(guardian);
         }
         // Si el killer fue el jugador, buscar guardianes cercanos adiestrados que asistieron

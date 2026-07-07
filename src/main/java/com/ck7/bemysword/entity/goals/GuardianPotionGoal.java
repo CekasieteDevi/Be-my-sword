@@ -2,6 +2,8 @@ package com.ck7.bemysword.entity.goals;
 
 import com.ck7.bemysword.entity.GuardianEntity;
 import com.ck7.bemysword.gui.GuardianContainer;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.ai.goal.Goal;
@@ -58,6 +60,12 @@ public class GuardianPotionGoal extends Goal {
         drinkTimer--;
         if (drinkTimer % 8 == 0 && drinkTimer > 0) {
             guardian.swing(InteractionHand.MAIN_HAND);
+        }
+        // Mismas partículas que usa un aldeano al subir de nivel
+        if (drinkTimer % 2 == 0 && drinkTimer > 0 && guardian.level() instanceof ServerLevel serverLevel) {
+            serverLevel.sendParticles(ParticleTypes.HAPPY_VILLAGER,
+                    guardian.getX(), guardian.getEyeY(), guardian.getZ(),
+                    4, 0.3, 0.3, 0.3, 0.0);
         }
         if (drinkTimer <= 0 && slotBeingDrunk >= 0) {
             guardian.drinkPotionFromSlot(slotBeingDrunk);

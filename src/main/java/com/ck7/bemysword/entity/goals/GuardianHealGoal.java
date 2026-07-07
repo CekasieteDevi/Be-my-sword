@@ -60,14 +60,14 @@ public class GuardianHealGoal extends Goal {
         }
 
         // Partículas
-        if (eatTimer % 4 == 0 && eatTimer > 0 && !food.isEmpty()) {
+        if (eatTimer % 2 == 0 && eatTimer > 0 && !food.isEmpty()) {
             if (guardian.level() instanceof ServerLevel serverLevel) {
                 serverLevel.sendParticles(
                         new ItemParticleOption(ParticleTypes.ITEM, food),
                         guardian.getX(),
                         guardian.getEyeY() - 0.1,
                         guardian.getZ(),
-                        3, 0.1, 0.1, 0.1, 0.05
+                        8, 0.25, 0.25, 0.25, 0.2
                 );
             }
         }

@@ -71,6 +71,46 @@ public class GuardianEntity extends net.minecraft.world.entity.TamableAnimal imp
     // para que no se mueva justo cuando está en el aire y termine esquivándola sin querer)
     private int holdStillTicks = 0;
 
+    // Cuántas razones distintas quieren que el guardián no se mueva ahora mismo (GUI de
+    // inventario abierta, esperando una poción arrojadiza, etc.). Contador en vez de un
+    // simple booleano porque pueden pedirlo varias cosas a la vez y no queremos que una
+    // termine y "libere" el movimiento mientras otra todavía lo necesita quieto.
+    private int freezeRequests = 0;
+
+    private void freezeMovement() {
+        if (level().isClientSide) return;
+        if (freezeRequests == 0) {
+            goalSelector.disableControlFlag(Goal.Flag.MOVE);
+        }
+        freezeRequests++;
+        getNavigation().stop();
+    }
+
+    private void unfreezeMovement() {
+        if (level().isClientSide) return;
+        if (freezeRequests > 0) freezeRequests--;
+        if (freezeRequests == 0) {
+            goalSelector.enableControlFlag(Goal.Flag.MOVE);
+        }
+    }
+
+    // Se queda quieto un instante ("pensando") después de matar algo, en vez de salir
+    // corriendo de inmediato hacia lo que sea que haga después.
+    private static final int KILL_PAUSE_TICKS = 20;
+    public void pauseAfterKill() {
+        holdStillFor(KILL_PAUSE_TICKS);
+    }
+
+    // Mientras el dueño tiene la GUI del inventario abierta, que no se mueva (así no se
+    // aleja y el jugador no tiene que perseguirlo para seguir gestionándole el equipo).
+    public void onInventoryOpened() {
+        freezeMovement();
+    }
+
+    public void onInventoryClosed() {
+        unfreezeMovement();
+    }
+
     // --- Armas: melee o arco, según lo que tenga equipado en la mano principal ---
     // Se instancian dentro de registerGoals() (no como inicializadores de campo): Mob.<init>
     // llama a registerGoals() antes de que corran los inicializadores de campo de esta subclase,
@@ -325,7 +365,7 @@ public class GuardianEntity extends net.minecraft.world.entity.TamableAnimal imp
     public void holdStillFor(int ticks) {
         if (level().isClientSide) return;
         if (holdStillTicks <= 0) {
-            goalSelector.disableControlFlag(Goal.Flag.MOVE);
+            freezeMovement();
         }
         holdStillTicks = Math.max(holdStillTicks, ticks);
         getNavigation().stop();
@@ -469,6 +509,7 @@ public class GuardianEntity extends net.minecraft.world.entity.TamableAnimal imp
                 return InteractionResult.sidedSuccess(level().isClientSide);
             }
             if (!level().isClientSide) {
+                onInventoryOpened();
                 net.minecraftforge.network.NetworkHooks.openScreen(
                         (net.minecraft.server.level.ServerPlayer) player,
                         new MenuProvider() {
@@ -693,7 +734,7 @@ public class GuardianEntity extends net.minecraft.world.entity.TamableAnimal imp
                 getNavigation().stop();
                 if (holdStillTicks <= 0) {
                     holdStillTicks = 0;
-                    goalSelector.enableControlFlag(Goal.Flag.MOVE);
+                    unfreezeMovement();
                 }
             }
 
