@@ -9,6 +9,7 @@ public class GuardianContainer extends SimpleContainer {
     public static final int ARMOR_SLOTS = 4;
     public static final int HAND_SLOTS = 2;
     public static final int FIXED_SLOTS = ARMOR_SLOTS + HAND_SLOTS;
+    public static final int MAX_LEVEL = 10;
 
     // Slots de inventario incremental según nivel
     public static int getInventorySize(int level) {
@@ -20,8 +21,16 @@ public class GuardianContainer extends SimpleContainer {
         return FIXED_SLOTS + getInventorySize(level);
     }
 
-    public GuardianContainer(int level) {
-        super(getTotalSize(level));
+    // El contenedor real siempre se crea con el tamaño del nivel máximo, sin importar el
+    // nivel actual del guardián. Antes se creaba del tamaño del nivel actual y se
+    // "agrandaba" (swapeando a un SimpleContainer nuevo) al subir de nivel, pero eso
+    // desincroniza cualquier GuardianMenu que ya esté abierto en ese momento en el cliente
+    // (su lista de slots quedó armada para el tamaño viejo) -> ArrayIndexOutOfBoundsException
+    // en bucle al sincronizar el inventario. GuardianMenu sigue mostrando solo los slots
+    // desbloqueados según el nivel actual (getInventorySize); el resto del array simplemente
+    // no se muestra todavía.
+    public GuardianContainer() {
+        super(getTotalSize(MAX_LEVEL));
     }
 
     // Índices de slots fijos

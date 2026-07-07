@@ -540,8 +540,6 @@ public class GuardianEntity extends net.minecraft.world.entity.TamableAnimal imp
         getAttribute(Attributes.MOVEMENT_SPEED).setBaseValue(0.3 + 0.2 * t);
         heal(getMaxHealth()); // curar al subir de nivel
 
-        growContainerIfNeeded();
-
         // Partículas de level up
         level().broadcastEntityEvent(this, (byte) 7);
 
@@ -553,35 +551,6 @@ public class GuardianEntity extends net.minecraft.world.entity.TamableAnimal imp
         }
 
         updateCustomName();
-    }
-
-    // El inventario del guardián crece con el nivel, pero el GuardianContainer (SimpleContainer)
-    // tiene tamaño fijo desde que se crea. Sin esto, GuardianMenu/GuardianScreen calculan el
-    // tamaño nuevo según el nivel actual y terminan accediendo a slots que no existen en el
-    // array interno del container viejo -> ArrayIndexOutOfBoundsException en bucle.
-    private void growContainerIfNeeded() {
-        if (guardianContainer == null) return;
-        int neededSize = GuardianContainer.getTotalSize(getGuardianLevel());
-        if (guardianContainer.getContainerSize() >= neededSize) return;
-
-        // Si alguien tiene el inventario abierto justo ahora, su GuardianMenu ya armó
-        // la lista de slots para el tamaño viejo. Swapear el contenedor por uno más
-        // grande debajo de un menú abierto desincroniza el inventario y tira
-        // ArrayIndexOutOfBoundsException en bucle en el cliente al sincronizar. Se lo
-        // cerramos para forzar que lo reabra (ya con el tamaño nuevo).
-        if (level() instanceof net.minecraft.server.level.ServerLevel serverLevel) {
-            for (net.minecraft.server.level.ServerPlayer p : serverLevel.players()) {
-                if (p.containerMenu instanceof com.ck7.bemysword.gui.GuardianMenu gm && gm.guardian == this) {
-                    p.closeContainer();
-                }
-            }
-        }
-
-        GuardianContainer bigger = new GuardianContainer(getGuardianLevel());
-        for (int i = 0; i < guardianContainer.getContainerSize(); i++) {
-            bigger.setItem(i, guardianContainer.getItem(i));
-        }
-        guardianContainer = bigger;
     }
 
     // --- Género ---
@@ -688,7 +657,7 @@ public class GuardianEntity extends net.minecraft.world.entity.TamableAnimal imp
         setSkinIndex(tag.contains("SkinIndex") ? tag.getInt("SkinIndex") : -1);
         // Cargar inventario
         if (tag.contains("GuardianInventory")) {
-            guardianContainer = new com.ck7.bemysword.gui.GuardianContainer(getGuardianLevel());
+            guardianContainer = new com.ck7.bemysword.gui.GuardianContainer();
             net.minecraft.nbt.ListTag inventoryTag = tag.getList("GuardianInventory", 10);
             for (int i = 0; i < inventoryTag.size(); i++) {
                 CompoundTag slotTag = inventoryTag.getCompound(i);
@@ -778,7 +747,7 @@ public class GuardianEntity extends net.minecraft.world.entity.TamableAnimal imp
 
     public GuardianContainer getGuardianContainer() {
         if (this.guardianContainer == null) {
-            this.guardianContainer = new GuardianContainer(getGuardianLevel());
+            this.guardianContainer = new GuardianContainer();
         }
         return this.guardianContainer;
     }
