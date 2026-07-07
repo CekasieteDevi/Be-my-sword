@@ -548,6 +548,19 @@ public class GuardianEntity extends net.minecraft.world.entity.TamableAnimal imp
         int neededSize = GuardianContainer.getTotalSize(getGuardianLevel());
         if (guardianContainer.getContainerSize() >= neededSize) return;
 
+        // Si alguien tiene el inventario abierto justo ahora, su GuardianMenu ya armó
+        // la lista de slots para el tamaño viejo. Swapear el contenedor por uno más
+        // grande debajo de un menú abierto desincroniza el inventario y tira
+        // ArrayIndexOutOfBoundsException en bucle en el cliente al sincronizar. Se lo
+        // cerramos para forzar que lo reabra (ya con el tamaño nuevo).
+        if (level() instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+            for (net.minecraft.server.level.ServerPlayer p : serverLevel.players()) {
+                if (p.containerMenu instanceof com.ck7.bemysword.gui.GuardianMenu gm && gm.guardian == this) {
+                    p.closeContainer();
+                }
+            }
+        }
+
         GuardianContainer bigger = new GuardianContainer(getGuardianLevel());
         for (int i = 0; i < guardianContainer.getContainerSize(); i++) {
             bigger.setItem(i, guardianContainer.getItem(i));

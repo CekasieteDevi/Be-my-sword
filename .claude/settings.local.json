@@ -17,7 +17,8 @@
       "PowerShell(.\\\\gradlew.bat processResources --console=plain 2>&1)",
       "PowerShell(gh auth *)",
       "PowerShell(winget install *)",
-      "PowerShell(git *)"
+      "PowerShell(git *)",
+      "Skill(run)"
     ]
   }
 }
