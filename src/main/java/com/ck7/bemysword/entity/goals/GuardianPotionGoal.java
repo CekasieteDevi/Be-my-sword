@@ -35,6 +35,14 @@ public class GuardianPotionGoal extends Goal {
         return slotBeingDrunk >= 0 && drinkTimer > 0;
     }
 
+    // Sin esto, en cuanto el objetivo queda al alcance el MeleeAttackGoal (prioridad más alta)
+    // le roba la mano a mitad de trago y nunca llega a tomarse la poción: queda cambiando
+    // de ítem en bucle sin pegar ni tomar nada. Una vez que empieza a beber, que termine.
+    @Override
+    public boolean isInterruptable() {
+        return false;
+    }
+
     @Override
     public void start() {
         drinkTimer = DRINK_DURATION;

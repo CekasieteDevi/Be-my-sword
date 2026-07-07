@@ -19,6 +19,7 @@ public class GuardianThrowRegenGoal extends Goal {
     private static final double RANGE = 10.0;
     private static final float LOW_HEALTH_FRACTION = 0.5f;
     private static final int THROW_COOLDOWN_TICKS = 100; // 5 segundos entre tiros
+    private static final int ALLY_HOLD_STILL_TICKS = 20; // 1 segundo: tiempo de vuelo de la poción
 
     public GuardianThrowRegenGoal(GuardianEntity guardian) {
         this.guardian = guardian;
@@ -46,6 +47,8 @@ public class GuardianThrowRegenGoal extends Goal {
     public void start() {
         int slot = findSplashRegenSlot();
         if (slot >= 0 && allyToHeal != null) {
+            // Se queda quieto mientras la poción está en el aire, para que no la esquive sin querer
+            allyToHeal.holdStillFor(ALLY_HOLD_STILL_TICKS);
             guardian.throwSplashPotionAt(slot, allyToHeal);
         }
         allyToHeal = null;

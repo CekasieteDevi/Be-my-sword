@@ -67,6 +67,10 @@ public class GuardianEntity extends net.minecraft.world.entity.TamableAnimal imp
     private int greetCooldown = 0;
     private static final int GREET_COOLDOWN_TICKS = 24 * 60 * 60 * 20; // 1 día real (20 ticks/seg)
 
+    // Se queda quieto un momento (usado cuando le están tirando una poción arrojadiza,
+    // para que no se mueva justo cuando está en el aire y termine esquivándola sin querer)
+    private int holdStillTicks = 0;
+
     // --- Armas: melee o arco, según lo que tenga equipado en la mano principal ---
     // Se instancian dentro de registerGoals() (no como inicializadores de campo): Mob.<init>
     // llama a registerGoals() antes de que corran los inicializadores de campo de esta subclase,
@@ -313,6 +317,18 @@ public class GuardianEntity extends net.minecraft.world.entity.TamableAnimal imp
         trident.shoot(dx, dy + horizontalDist * 0.2, dz, 1.6f, (float) (14 - level().getDifficulty().getId() * 4));
         playSound(SoundEvents.DROWNED_SHOOT, 1.0f, 1.0f / (random.nextFloat() * 0.4f + 0.8f));
         level().addFreshEntity(trident);
+    }
+
+    // Se queda quieto (no se mueve, no lo controla ningún goal de movimiento) por los
+    // ticks indicados. Usado para que un aliado no se corra justo cuando le están
+    // tirando una poción arrojadiza encima.
+    public void holdStillFor(int ticks) {
+        if (level().isClientSide) return;
+        if (holdStillTicks <= 0) {
+            goalSelector.disableControlFlag(Goal.Flag.MOVE);
+        }
+        holdStillTicks = Math.max(holdStillTicks, ticks);
+        getNavigation().stop();
     }
 
     // --- Pociones: usadas desde GuardianPotionGoal / GuardianThrowRegenGoal ---
@@ -703,6 +719,14 @@ public class GuardianEntity extends net.minecraft.world.entity.TamableAnimal imp
             updateCustomName();
             if (breedCooldown > 0) breedCooldown--;
             if (greetCooldown > 0) greetCooldown -= 10;
+            if (holdStillTicks > 0) {
+                holdStillTicks -= 10;
+                getNavigation().stop();
+                if (holdStillTicks <= 0) {
+                    holdStillTicks = 0;
+                    goalSelector.enableControlFlag(Goal.Flag.MOVE);
+                }
+            }
 
             // Sistema de amor
             if (loveTicks > 0) {
