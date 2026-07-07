@@ -7,6 +7,7 @@ import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.world.MenuProvider;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
@@ -21,12 +22,15 @@ import net.minecraft.world.entity.monster.Creeper;
 import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.entity.monster.RangedAttackMob;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.projectile.AbstractArrow;
 import net.minecraft.world.entity.projectile.Arrow;
+import net.minecraft.world.entity.projectile.ThrownPotion;
 import net.minecraft.world.item.BowItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.item.enchantment.Enchantments;
+import net.minecraft.world.item.alchemy.PotionUtils;
 import net.minecraft.world.level.Level;
 import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
@@ -59,6 +63,10 @@ public class GuardianEntity extends net.minecraft.world.entity.TamableAnimal imp
     private java.util.UUID lovePlayer = null;
     private int breedCooldown = 0;
 
+    // Saludo de guardianes salvajes al hacerles click derecho (sin manzana dorada)
+    private int greetCooldown = 0;
+    private static final int GREET_COOLDOWN_TICKS = 24 * 60 * 60 * 20; // 1 día real (20 ticks/seg)
+
     // --- Armas: melee o arco, según lo que tenga equipado en la mano principal ---
     // Se instancian dentro de registerGoals() (no como inicializadores de campo): Mob.<init>
     // llama a registerGoals() antes de que corran los inicializadores de campo de esta subclase,
@@ -77,6 +85,14 @@ public class GuardianEntity extends net.minecraft.world.entity.TamableAnimal imp
     private static final float MELEE_CRIT_CHANCE = 0.1f;
     private static final float MELEE_CRIT_DAMAGE_MULTIPLIER = 1.5f;
     private static final float MELEE_CRIT_KNOCKBACK = 1.5f;
+
+    // Nivel máximo: al llegar acá deja de ganar experiencia y subir de nivel
+    private static final int MAX_LEVEL = 10;
+
+    // Chance de bloquear un golpe con el escudo (si lo tiene equipado en el offhand),
+    // escala linealmente entre nivel 1 y MAX_LEVEL, igual que el resto de las stats.
+    private static final float SHIELD_BLOCK_CHANCE_AT_LVL1 = 0.05f;
+    private static final float SHIELD_BLOCK_CHANCE_AT_MAX_LVL = 0.25f;
 
     // Nombres random para guardianes masculinos y femeninos
     private static final List<String> MALE_NAMES = List.of(
@@ -124,6 +140,8 @@ public class GuardianEntity extends net.minecraft.world.entity.TamableAnimal imp
         this.goalSelector.addGoal(2, new SitWhenOrderedToGoal(this));
         this.goalSelector.addGoal(3, meleeGoal);
         this.goalSelector.addGoal(4, new com.ck7.bemysword.entity.goals.GuardianHealGoal(this));
+        this.goalSelector.addGoal(4, new com.ck7.bemysword.entity.goals.GuardianPotionGoal(this));
+        this.goalSelector.addGoal(4, new com.ck7.bemysword.entity.goals.GuardianThrowRegenGoal(this));
         this.goalSelector.addGoal(5, new FollowOwnerGoal(this, 1.0, 10f, 2f, false));
         this.goalSelector.addGoal(5, new WaterAvoidingRandomStrollGoal(this, 1.0));
         this.goalSelector.addGoal(6, new LookAtPlayerGoal(this, Player.class, 8f));
@@ -148,6 +166,24 @@ public class GuardianEntity extends net.minecraft.world.entity.TamableAnimal imp
 
     private boolean hasShieldEquipped() {
         return getItemBySlot(net.minecraft.world.entity.EquipmentSlot.OFFHAND).is(Items.SHIELD);
+    }
+
+    // Chance de bloquear cualquier golpe si tiene escudo equipado: 5% a nivel 1, hasta 25% a nivel MAX_LEVEL.
+    private float getShieldBlockChance() {
+        double t = (Math.min(getGuardianLevel(), MAX_LEVEL) - 1) / (double) (MAX_LEVEL - 1);
+        return (float) (SHIELD_BLOCK_CHANCE_AT_LVL1 + (SHIELD_BLOCK_CHANCE_AT_MAX_LVL - SHIELD_BLOCK_CHANCE_AT_LVL1) * t);
+    }
+
+    @Override
+    public boolean hurt(DamageSource source, float amount) {
+        if (!level().isClientSide
+                && hasShieldEquipped()
+                && source.getEntity() != null
+                && random.nextFloat() < getShieldBlockChance()) {
+            playSound(SoundEvents.SHIELD_BLOCK, 1.0f, 0.9f + random.nextFloat() * 0.2f);
+            return false;
+        }
+        return super.hurt(source, amount);
     }
 
     private boolean hasBowEquipped() {
@@ -279,6 +315,71 @@ public class GuardianEntity extends net.minecraft.world.entity.TamableAnimal imp
         level().addFreshEntity(trident);
     }
 
+    // --- Pociones: usadas desde GuardianPotionGoal / GuardianThrowRegenGoal ---
+
+    // ¿El ítem del slot es una poción bebible (no arrojadiza) que da el efecto indicado?
+    public boolean slotHasDrinkablePotionWithEffect(int slot, net.minecraft.world.effect.MobEffect effect) {
+        ItemStack stack = getGuardianContainer().getItem(slot);
+        if (stack.isEmpty() || !stack.is(Items.POTION)) return false;
+        for (MobEffectInstance instance : PotionUtils.getMobEffects(stack)) {
+            if (instance.getEffect() == effect) return true;
+        }
+        return false;
+    }
+
+    // ¿El ítem del slot es una poción arrojadiza que da el efecto indicado?
+    public boolean slotHasSplashPotionWithEffect(int slot, net.minecraft.world.effect.MobEffect effect) {
+        ItemStack stack = getGuardianContainer().getItem(slot);
+        if (stack.isEmpty() || !stack.is(Items.SPLASH_POTION)) return false;
+        for (MobEffectInstance instance : PotionUtils.getMobEffects(stack)) {
+            if (instance.getEffect() == effect) return true;
+        }
+        return false;
+    }
+
+    // Se toma la poción bebible del slot indicado: aplica sus efectos y consume el ítem
+    // (dejando el frasco de cristal vacío atrás, igual que hace un jugador al beber).
+    public void drinkPotionFromSlot(int slot) {
+        if (level().isClientSide) return;
+        GuardianContainer container = getGuardianContainer();
+        ItemStack stack = container.getItem(slot);
+        if (stack.isEmpty() || !stack.is(Items.POTION)) return;
+
+        for (MobEffectInstance instance : PotionUtils.getMobEffects(stack)) {
+            addEffect(new MobEffectInstance(instance));
+        }
+        playSound(SoundEvents.GENERIC_DRINK, 1.0f, 1.0f);
+
+        stack.shrink(1);
+        container.setItem(slot, stack.isEmpty() ? new ItemStack(Items.GLASS_BOTTLE) : stack);
+
+        ItemStack mainhand = container.getItem(GuardianContainer.SLOT_MAINHAND);
+        setItemInHand(InteractionHand.MAIN_HAND, mainhand);
+    }
+
+    // Le tira la poción arrojadiza del slot indicado a un aliado herido (misma fórmula que usa el Witch real).
+    public void throwSplashPotionAt(int slot, net.minecraft.world.entity.LivingEntity target) {
+        if (level().isClientSide) return;
+        GuardianContainer container = getGuardianContainer();
+        ItemStack stack = container.getItem(slot);
+        if (stack.isEmpty() || !stack.is(Items.SPLASH_POTION)) return;
+
+        double dx = target.getX() - getX();
+        double dy = target.getEyeY() - 1.1 - getY();
+        double dz = target.getZ() - getZ();
+        double dist = Math.sqrt(dx * dx + dz * dz);
+
+        ThrownPotion thrown = new ThrownPotion(level(), this);
+        thrown.setItem(stack.copy());
+        thrown.setXRot(thrown.getXRot() - -20.0f);
+        thrown.shoot(dx, dy + dist * 0.2, dz, 0.75f, 8.0f);
+        playSound(SoundEvents.WITCH_THROW, 1.0f, 0.8f + random.nextFloat() * 0.4f);
+        level().addFreshEntity(thrown);
+
+        stack.shrink(1);
+        container.setItem(slot, stack);
+    }
+
     // Levanta el escudo cuando hay un Creeper cerca para amortiguar la explosión.
     private void updateShieldBlocking() {
         if (level().isClientSide) return;
@@ -291,6 +392,15 @@ public class GuardianEntity extends net.minecraft.world.entity.TamableAnimal imp
             startUsingItem(getOffhandItem().is(Items.SHIELD) ? InteractionHand.OFF_HAND : InteractionHand.MAIN_HAND);
         } else if (!shouldBlock && isUsingItem() && getUseItem().is(Items.SHIELD)) {
             stopUsingItem();
+        }
+    }
+
+    // --- Sistema de diálogos: el guardián comenta ciertas acciones en el chat del dueño ---
+    private void say(String message) {
+        if (level().isClientSide) return;
+        if (getOwner() instanceof Player owner) {
+            String name = getCustomName() != null ? getCustomName().getString() : "Guardian";
+            owner.sendSystemMessage(Component.literal("§b" + name + "§f: " + message));
         }
     }
 
@@ -316,6 +426,13 @@ public class GuardianEntity extends net.minecraft.world.entity.TamableAnimal imp
             return InteractionResult.sidedSuccess(level().isClientSide);
         }
 
+        // Saludo casual: si es salvaje y no le dieron manzana dorada, saluda por nombre (con cooldown)
+        if (!isTame() && !level().isClientSide && greetCooldown <= 0) {
+            greetCooldown = GREET_COOLDOWN_TICKS;
+            player.sendSystemMessage(Component.literal("§b" + (getCustomName() != null ? getCustomName().getString() : "Guardian")
+                    + "§f: hi " + player.getName().getString() + "!"));
+        }
+
         // Reproducción con melón brillante
         if (isTame() && isOwnedBy(player) && itemInHand.is(Items.GLISTERING_MELON_SLICE)) {
             if (!level().isClientSide && loveTicks <= 0 && breedCooldown <= 0) {
@@ -330,7 +447,9 @@ public class GuardianEntity extends net.minecraft.world.entity.TamableAnimal imp
         // Abrir GUI (shift+click para sentarse/pararse)
         if (isTame() && isOwnedBy(player)) {
             if (player.isShiftKeyDown()) {
-                setOrderedToSit(!isOrderedToSit());
+                boolean sitting = !isOrderedToSit();
+                setOrderedToSit(sitting);
+                say(sitting ? "Okay I'm staying right here!" : "Okay I will follow you!");
                 return InteractionResult.sidedSuccess(level().isClientSide);
             }
             if (!level().isClientSide) {
@@ -375,6 +494,7 @@ public class GuardianEntity extends net.minecraft.world.entity.TamableAnimal imp
 
     public void addExperience(int amount) {
         if (level().isClientSide) return;
+        if (getGuardianLevel() >= MAX_LEVEL) return; // nivel máximo: no gana más experiencia
         int newExp = getExperience() + amount;
         int expNeeded = getExpForNextLevel();
         if (newExp >= expNeeded) {
@@ -569,6 +689,7 @@ public class GuardianEntity extends net.minecraft.world.entity.TamableAnimal imp
         if (!level().isClientSide && tickCount % 10 == 0) {
             updateCustomName();
             if (breedCooldown > 0) breedCooldown--;
+            if (greetCooldown > 0) greetCooldown -= 10;
 
             // Sistema de amor
             if (loveTicks > 0) {
