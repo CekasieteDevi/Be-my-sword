@@ -119,7 +119,7 @@ public class GuardianScreen extends AbstractContainerScreen<GuardianMenu> {
         drawBorder(g, barX, y + HP_BAR_Y, barW, 5, COL_BORDER);
 
         // Estadísticas de combate (suben con el nivel)
-        double atk = menu.guardian.getAttributeValue(Attributes.ATTACK_DAMAGE);
+        double atk = menu.getAttackDamageDisplay();
         double def = menu.guardian.getAttributeValue(Attributes.ARMOR);
         double spd = menu.guardian.getAttributeValue(Attributes.MOVEMENT_SPEED);
         g.drawString(font,

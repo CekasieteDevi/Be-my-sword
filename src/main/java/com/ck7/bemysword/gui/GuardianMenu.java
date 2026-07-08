@@ -4,9 +4,11 @@ import com.ck7.bemysword.client.screen.GuardianScreen;
 import com.ck7.bemysword.entity.GuardianEntity;
 import com.ck7.bemysword.init.ModMenuTypes;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.DataSlot;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.ArmorItem;
@@ -17,6 +19,12 @@ public class GuardianMenu extends AbstractContainerMenu {
     private final GuardianContainer guardianContainer;
     private final int inventorySize;
     private final int invRows;
+
+    // Attributes.ATTACK_DAMAGE no está marcado como "syncable" en vanilla (a diferencia
+    // de MAX_HEALTH/ARMOR/MOVEMENT_SPEED), así que el cliente nunca se entera cuando
+    // cambia en el servidor. Lo sincronizamos a mano acá (guardado *10 para conservar
+    // un decimal en un DataSlot, que solo maneja enteros).
+    private final DataSlot attackDamageX10 = DataSlot.standalone();
 
     public GuardianMenu(int windowId, Inventory playerInventory, FriendlyByteBuf buf) {
         this(windowId, playerInventory,
@@ -29,6 +37,7 @@ public class GuardianMenu extends AbstractContainerMenu {
         this.inventorySize     = GuardianContainer.getInventorySize(guardian.getGuardianLevel());
         this.invRows           = (int) Math.ceil(inventorySize / 9.0);
         this.guardianContainer = guardian.getGuardianContainer();
+        this.addDataSlot(attackDamageX10);
 
         // Panel izquierdo — armadura (mismas Y que GuardianScreen)
         this.addSlot(new Slot(guardianContainer, GuardianContainer.SLOT_HELMET, 6, 18) {
@@ -96,6 +105,19 @@ public class GuardianMenu extends AbstractContainerMenu {
     @Override
     public boolean stillValid(Player player) {
         return guardian.isAlive() && player.distanceTo(guardian) < 8.0f;
+    }
+
+    // Valor de ataque a mostrar en pantalla (ver comentario de attackDamageX10 arriba)
+    public double getAttackDamageDisplay() {
+        return attackDamageX10.get() / 10.0;
+    }
+
+    @Override
+    public void broadcastChanges() {
+        if (!guardian.level().isClientSide) {
+            attackDamageX10.set((int) Math.round(guardian.getAttributeValue(Attributes.ATTACK_DAMAGE) * 10));
+        }
+        super.broadcastChanges();
     }
 
     @Override
